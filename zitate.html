@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zitate Archiv</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            line-height: 1.6;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin: 2rem 0;
+            color: var(--primary-color);
+            font-size: 2.5em;
+        }
+
+        .filters {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-bottom: 30px;
+        }
+
+        .filter-group {
+            flex: 1;
+            min-width: 250px;
+        }
+
+        select, input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            background: white;
+        }
+
+        .quote-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 25px;
+        }
+
+        .quote-card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+
+        .quote-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .quote-text {
+            font-size: 1.1em;
+            color: #333;
+            margin-bottom: 15px;
+            font-style: italic;
+            line-height: 1.4;
+        }
+
+        .author {
+            font-weight: 600;
+            color: var(--secondary-color);
+            margin-bottom: 10px;
+        }
+
+        .category {
+            display: inline-block;
+            background: #e8f4ff;
+            color: var(--primary-color);
+            padding: 6px 15px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            margin: 5px 0;
+        }
+
+        @media (max-width: 768px) {
+            .filters {
+                flex-direction: column;
+            }
+            
+            h1 {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📚 Zitate Sammlung</h1>
+        
+        <div class="filters">
+            <div class="filter-group">
+                <input type="text" id="searchInput" placeholder="Zitat suchen...">
+            </div>
+            <div class="filter-group">
+                <select id="categoryFilter">
+                    <option value="">Alle Kategorien</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <select id="authorFilter">
+                    <option value="">Alle Autoren</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="quote-grid" id="quoteContainer"></div>
+    </div>
+
+    <script>
+        let allQuotes = [];
+
+        async function loadQuotes() {
+            const response = await fetch('https://raw.githubusercontent.com/kvnschmu/zitate/main/Zitate.csv');
+            const data = await response.text();
+            
+            const rows = data.split('\n').slice(1); // Header überspringen
+            allQuotes = rows.filter(row => row.trim()).map(row => {
+                const [kategorie, zitat, autor] = row.split(';').map(field => 
+                    field.trim().replace(/^"|"$/g, '')
+                );
+                
+                return {
+                    kategorie: kategorie || 'Sonstige',
+                    zitat: zitat || '',
+                    autor: autor || 'Unbekannt'
+                };
+            });
+
+            return allQuotes;
+        }
+
+        function populateFilters(quotes) {
+            const categories = [...new Set(quotes.map(q => q.kategorie))].sort();
+            const authors = [...new Set(quotes.map(q => q.autor))].sort();
+
+            const categoryFilter = document.getElementById('categoryFilter');
+            categories.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat;
+                option.textContent = cat;
+                categoryFilter.appendChild(option);
+            });
+
+            const authorFilter = document.getElementById('authorFilter');
+            authors.forEach(author => {
+                const option = document.createElement('option');
+                option.value = author;
+                option.textContent = author;
+                authorFilter.appendChild(option);
+            });
+        }
+
+        function filterQuotes() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const selectedCategory = document.getElementById('categoryFilter').value;
+            const selectedAuthor = document.getElementById('authorFilter').value;
+
+            return allQuotes.filter(quote => {
+                const matchesSearch = quote.zitat.toLowerCase().includes(searchTerm) ||
+                                      quote.autor.toLowerCase().includes(searchTerm) ||
+                                      quote.kategorie.toLowerCase().includes(searchTerm);
+
+                const matchesCategory = !selectedCategory || quote.kategorie === selectedCategory;
+                const matchesAuthor = !selectedAuthor || quote.autor === selectedAuthor;
+
+                return matchesSearch && matchesCategory && matchesAuthor;
+            });
+        }
+
+        function displayQuotes(quotes) {
+            const container = document.getElementById('quoteContainer');
+            container.innerHTML = quotes.map(quote => `
+                <div class="quote-card">
+                    <div class="category">${quote.kategorie}</div>
+                    <div class="quote-text">"${quote.zitat}"</div>
+                    <div class="author">${quote.autor}</div>
+                </div>
+            `).join('');
+        }
+
+        function setupEventListeners() {
+            document.getElementById('searchInput').addEventListener('input', updateDisplay);
+            document.getElementById('categoryFilter').addEventListener('change', updateDisplay);
+            document.getElementById('authorFilter').addEventListener('change', updateDisplay);
+        }
+
+        function updateDisplay() {
+            const filtered = filterQuotes();
+            displayQuotes(filtered);
+        }
+
+        async function init() {
+            await loadQuotes();
+            populateFilters(allQuotes);
+            setupEventListeners();
+            updateDisplay();
+        }
+
+        init();
+    </script>
+</body>
+</html>
